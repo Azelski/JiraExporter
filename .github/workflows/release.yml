@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    tags:
+      - 'v[0-9]*.[0-9]*.[0-9]+'
 
 permissions:
   contents: write
@@ -11,12 +13,15 @@ permissions:
 
 jobs:
   release-please:
+    if: github.ref_type == 'branch'
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
-      - uses: googleapis/release-please-action@v4
+      - uses: googleapis/release-please-action@v4.4.1
         id: release
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -24,13 +29,19 @@ jobs:
           manifest-file: .release-please-manifest.json
 
   build:
+    # runs either when release-please created a release, or a stable tag was pushed directly
+    if: |
+      always() &&
+      (
+        (needs.release-please.result == 'success' && needs.release-please.outputs.release_created) ||
+        github.ref_type == 'tag'
+      )
     needs: release-please
-    if: ${{ needs.release-please.outputs.release_created }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.release-please.outputs.tag_name }}
+          ref: ${{ github.ref }}
 
       - uses: DeterminateSystems/nix-installer-action@v16
 
@@ -43,7 +54,18 @@ jobs:
         id: package
         run: echo "zip_name=$(find . -maxdepth 1 -name 'jira-exporter-*.zip' | head -1 | sed 's|^./||')" >> "$GITHUB_OUTPUT"
 
-      - name: Upload zip to release
+      - name: Create release and upload zip (tag-triggered)
+        if: github.ref_type == 'tag'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload ${{ needs.release-please.outputs.tag_name }} "${{ steps.package.outputs.zip_name }}"
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --title "Jira Exporter ${{ github.ref_name }}" \
+            --generate-notes \
+            "${{ steps.package.outputs.zip_name }}"
+
+      - name: Upload zip to release (release-please-triggered)
+        if: needs.release-please.outputs.release_created
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ needs.release-please.outputs.tag_name }}" "${{ steps.package.outputs.zip_name }}"
