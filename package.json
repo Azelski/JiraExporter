@@ -13,7 +13,8 @@
   "scripts": {
     "dev": "vite build --watch --mode development",
     "build": "vite build",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "package": "pnpm build && node -e \"const v=require('./dist/manifest.json').version;require('child_process').execSync('cd dist && zip -r ../jira-exporter-'+v+'.zip .',{stdio:'inherit',shell:true})\""
   },
   "dependencies": {
     "jszip": "^3.10.1",

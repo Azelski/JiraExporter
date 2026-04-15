@@ -30,6 +30,27 @@
           '');
         };
 
+        apps.package = {
+          type = "app";
+          program = toString (pkgs.writeShellScript "package-jira-exporter" ''
+            set -euo pipefail
+            if [ ! -f package.json ]; then
+              echo "Error: run this from the JiraExporter repo root" >&2
+              exit 1
+            fi
+            export PATH="${pkgs.lib.makeBinPath [ pkgs.nodejs_20 pkgs.pnpm pkgs.zip ]}:$PATH"
+            echo "==> Installing dependencies…"
+            pnpm install --frozen-lockfile 2>/dev/null || pnpm install
+            echo "==> Building extension…"
+            pnpm build
+            echo "==> Packaging extension…"
+            VERSION=$(node -e "console.log(require('./dist/manifest.json').version)")
+            cd dist && zip -r ../jira-exporter-''${VERSION}.zip . && cd ..
+            echo ""
+            echo "✓ Packaged: jira-exporter-''${VERSION}.zip"
+          '');
+        };
+
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
             nodejs_20
