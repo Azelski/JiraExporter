@@ -12,6 +12,7 @@ const SETTING_DEFAULTS = {
   includeComments: true,
   saveAs: false,
   contextMenu: true,
+  disabledCustomFields: [],
 };
 
 const MENU_ID = "export-jira-ticket";
@@ -85,12 +86,13 @@ async function getSettings() {
 
 async function exportTicket(baseUrl, issueKey) {
   const settings = await getSettings();
-  const { linkDepth: maxDepth, llmContext, includeAttachments, includeComments, saveAs } = settings;
+  const { linkDepth: maxDepth, llmContext, includeAttachments, includeComments, saveAs, disabledCustomFields } = settings;
   console.log(`[JiraExporter] Exporting ${issueKey}`, settings);
 
   const issueMap = await crawlLinkedIssues(baseUrl, issueKey, maxDepth);
   console.log(`[JiraExporter] Fetched ${issueMap.size} issue(s)`);
 
+  const allDiscoveredFields = {};
   const issues = await Promise.all(
     [...issueMap.entries()].map(async ([key, issue]) => {
       let attachments = [];
@@ -105,11 +107,17 @@ async function exportTicket(baseUrl, issueKey) {
       }
 
       const attachFileNames = attachments.map((a) => a.name);
-      const md = buildMarkdown(issue, attachFileNames, { includeComments });
+      const { md, discoveredFields } = buildMarkdown(issue, attachFileNames, { includeComments, disabledCustomFields });
+      Object.assign(allDiscoveredFields, discoveredFields);
 
       return { key, md, attachments };
     }),
   );
+
+  if (Object.keys(allDiscoveredFields).length) {
+    const { customFieldDefs = {} } = await chrome.storage.local.get({ customFieldDefs: {} });
+    await chrome.storage.local.set({ customFieldDefs: { ...customFieldDefs, ...allDiscoveredFields } });
+  }
 
   const index = llmContext ? buildIndex(issueKey, issues, issueMap) : null;
 

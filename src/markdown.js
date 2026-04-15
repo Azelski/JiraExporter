@@ -8,7 +8,7 @@ export function htmlToMarkdown(html) {
 }
 
 export function buildMarkdown(issue, attachFiles, opts = {}) {
-  const { includeComments = true } = opts;
+  const { includeComments = true, disabledCustomFields = [] } = opts;
   const fields = issue.fields;
   const rendered = issue.renderedFields ?? {};
   const key = issue.key;
@@ -83,6 +83,28 @@ export function buildMarkdown(issue, attachFiles, opts = {}) {
     lines.push("");
   }
 
+  const HANDLED_FIELDS = new Set([
+    "summary", "description", "comment", "issuelinks", "subtasks", "parent",
+    "status", "issuetype", "priority", "assignee", "reporter", "created",
+    "updated", "labels", "attachment", "worklog", "watches", "votes",
+    "fixVersions", "versions", "components", "environment", "timetracking",
+    "aggregatetimespent", "timespent", "timeestimate", "aggregatetimeestimate",
+  ]);
+  const names = issue.names ?? {};
+  const disabled = new Set(disabledCustomFields);
+  const discoveredFields = {};
+  for (const [fieldId, renderedValue] of Object.entries(rendered)) {
+    if (HANDLED_FIELDS.has(fieldId)) continue;
+    if (!renderedValue || typeof renderedValue !== "string") continue;
+    const fieldName = names[fieldId] ?? fieldId;
+    discoveredFields[fieldId] = fieldName;
+    if (disabled.has(fieldId)) continue;
+    lines.push(`## ${fieldName}`);
+    lines.push("");
+    lines.push(htmlToMarkdown(renderedValue));
+    lines.push("");
+  }
+
   if (attachFiles.length) {
     lines.push("## Attachments");
     lines.push("");
@@ -102,7 +124,7 @@ export function buildMarkdown(issue, attachFiles, opts = {}) {
     md = md.replace(pattern, `$1(./attachments/${name})`);
   }
 
-  return md;
+  return { md, discoveredFields };
 }
 
 function escapeRegex(s) {

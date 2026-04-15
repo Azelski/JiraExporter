@@ -5,6 +5,7 @@ const DEFAULTS = {
   includeComments: true,
   saveAs: false,
   contextMenu: true,
+  disabledCustomFields: [],
 };
 
 const $ = (id) => document.getElementById(id);
@@ -89,6 +90,7 @@ exportBtn.addEventListener("click", async () => {
     } else {
       statusEl.textContent = `${response?.file ?? detectedKey + ".zip"} — ${response?.issueCount ?? "?"} issue(s)`;
       statusEl.className = "status ok";
+      renderCustomFields();
     }
   } catch (err) {
     statusEl.textContent = err.message;
@@ -101,3 +103,74 @@ exportBtn.addEventListener("click", async () => {
 });
 
 detectTicket();
+
+async function renderCustomFields() {
+  const { customFieldDefs = {} } = await chrome.storage.local.get({ customFieldDefs: {} });
+  const fieldIds = Object.keys(customFieldDefs);
+
+  const list = $("custom-fields-list");
+
+  list.innerHTML = "";
+
+  if (fieldIds.length === 0) {
+    const hint = document.createElement("div");
+    hint.className = "field-hint";
+    hint.style.paddingBottom = "0.5rem";
+    hint.textContent = "Run an export to discover available fields.";
+    list.appendChild(hint);
+    return;
+  }
+
+  const { disabledCustomFields = [] } = await chrome.storage.sync.get({ disabledCustomFields: [] });
+  const disabled = new Set(disabledCustomFields);
+
+  const sorted = fieldIds.sort((a, b) =>
+    customFieldDefs[a].localeCompare(customFieldDefs[b]),
+  );
+
+  for (const fieldId of sorted) {
+    const name = customFieldDefs[fieldId];
+
+    const div = document.createElement("div");
+    div.className = "field";
+
+    const info = document.createElement("div");
+    info.className = "field-info";
+    const label = document.createElement("div");
+    label.className = "field-label";
+    label.textContent = name;
+    info.appendChild(label);
+
+    const toggleLabel = document.createElement("label");
+    toggleLabel.className = "toggle";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.dataset.fieldId = fieldId;
+    checkbox.checked = !disabled.has(fieldId);
+    checkbox.addEventListener("change", saveDisabledFields);
+    const slider = document.createElement("span");
+    slider.className = "slider";
+    toggleLabel.append(checkbox, slider);
+
+    div.append(info, toggleLabel);
+    list.appendChild(div);
+  }
+}
+
+function saveDisabledFields() {
+  const inputs = document.querySelectorAll("#custom-fields-list input[type=checkbox]");
+  const disabled = [];
+  inputs.forEach((input) => {
+    if (!input.checked) disabled.push(input.dataset.fieldId);
+  });
+  save({ disabledCustomFields: disabled });
+}
+
+$("custom-fields-title").addEventListener("click", () => {
+  const list = $("custom-fields-list");
+  const title = $("custom-fields-title");
+  const isOpen = title.classList.contains("open");
+  title.classList.toggle("open", !isOpen);
+  list.style.display = isOpen ? "none" : "";
+  if (!isOpen) renderCustomFields();
+});

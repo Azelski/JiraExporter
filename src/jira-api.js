@@ -1,5 +1,5 @@
 export async function fetchIssue(baseUrl, issueKey) {
-  const url = `${baseUrl}/rest/api/2/issue/${encodeURIComponent(issueKey)}?expand=renderedFields`;
+  const url = `${baseUrl}/rest/api/2/issue/${encodeURIComponent(issueKey)}?expand=renderedFields,names`;
 
   const res = await fetch(url, { credentials: "include" });
   if (!res.ok) {

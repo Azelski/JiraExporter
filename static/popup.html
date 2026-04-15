@@ -183,6 +183,27 @@
       transform: translateX(18px);
       background: var(--on-primary-container);
     }
+
+    /* Custom fields collapsible */
+    .section-title.collapsible {
+      cursor: pointer;
+      user-select: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .section-title.collapsible .chevron {
+      font-size: 0.6rem;
+      transition: transform 0.2s;
+      color: var(--on-surface-dim);
+    }
+    .section-title.collapsible.open .chevron {
+      transform: rotate(90deg);
+    }
+    #custom-fields-list {
+      max-height: 200px;
+      overflow-y: auto;
+    }
   </style>
 </head>
 <body>
@@ -271,6 +292,18 @@
   </div>
 
   </div><!-- .content -->
+
+  <!-- Custom fields section -->
+  <div id="custom-fields-section">
+    <div class="content" style="padding-top:0">
+      <div class="divider"></div>
+      <div class="section-title collapsible" id="custom-fields-title">
+        <span>Custom fields</span>
+        <span class="chevron">&#9658;</span>
+      </div>
+      <div id="custom-fields-list" style="display:none"></div>
+    </div>
+  </div>
 
   <script src="popup.js"></script>
 </body>
