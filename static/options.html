@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Jira Exporter</title>
+  <link rel="stylesheet" href="fonts.css">
+  <style>
+    :root {
+      --bg: #0c1322;
+      --surface: #131b2e;
+      --surface-high: #1a2540;
+      --surface-highest: #212d4a;
+      --primary: #d0bcff;
+      --primary-container: #a078ff;
+      --on-surface: #dce2f7;
+      --on-surface-dim: #8e95a9;
+      --on-primary-container: #1a0040;
+      --saved: #a078ff;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--on-surface);
+      min-width: 380px;
+      padding: 2rem 2rem 1.5rem;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 2rem;
+    }
+
+    .header img {
+      width: 32px;
+      height: 32px;
+      background: rgba(220, 226, 247, 0.12);
+      border-radius: 0.375rem;
+      padding: 2px;
+    }
+
+    .header h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 1.25rem;
+      background: linear-gradient(135deg, var(--primary), var(--primary-container));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .section {
+      background: var(--surface);
+      border-radius: 0.375rem;
+      padding: 1.25rem 1.25rem;
+      margin-bottom: 1rem;
+    }
+
+    .section + .section { margin-top: 1rem; }
+
+    .field {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .field-label {
+      font-weight: 500;
+      font-size: 0.875rem;
+    }
+
+    .field-hint {
+      color: var(--on-surface-dim);
+      font-size: 0.75rem;
+      margin-top: 0.375rem;
+    }
+
+    input[type=number] {
+      width: 64px;
+      padding: 0.375rem 0.5rem;
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 0.875rem;
+      color: var(--on-surface);
+      background: var(--surface-highest);
+      border: none;
+      border-bottom: 2px solid transparent;
+      border-radius: 0.25rem 0.25rem 0 0;
+      outline: none;
+      text-align: center;
+      transition: border-color 0.2s;
+    }
+
+    input[type=number]:focus {
+      border-bottom-color: var(--primary);
+    }
+
+    /* Toggle switch */
+    .toggle {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      flex-shrink: 0;
+    }
+
+    .toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle .slider {
+      position: absolute;
+      inset: 0;
+      background: var(--surface-highest);
+      border-radius: 999px;
+      cursor: pointer;
+      transition: background 0.25s;
+    }
+
+    .toggle .slider::before {
+      content: '';
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      left: 3px;
+      top: 3px;
+      background: var(--on-surface-dim);
+      border-radius: 50%;
+      transition: transform 0.25s, background 0.25s;
+    }
+
+    .toggle input:checked + .slider {
+      background: linear-gradient(135deg, var(--primary), var(--primary-container));
+    }
+
+    .toggle input:checked + .slider::before {
+      transform: translateX(20px);
+      background: var(--on-primary-container);
+    }
+
+    .toast {
+      text-align: center;
+      color: var(--saved);
+      font-size: 0.75rem;
+      font-weight: 500;
+      margin-top: 1rem;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .toast.visible { opacity: 1; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <img src="icons/lambda_hexnull.png" alt="">
+    <h1>Jira Exporter</h1>
+  </div>
+
+  <div class="section">
+    <div class="field">
+      <div>
+        <div class="field-label">Link crawl depth</div>
+        <div class="field-hint">Levels of linked issues to follow (0 = current only)</div>
+      </div>
+      <input type="number" id="depth" min="0" max="10" value="4">
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="field">
+      <div>
+        <div class="field-label">LLM context mode</div>
+        <div class="field-hint">Adds INDEX.md and navigation hints for LLMs</div>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="llm-mode" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="field">
+      <div>
+        <div class="field-label">Include attachments</div>
+        <div class="field-hint">Download and bundle attachment files in the ZIP</div>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="include-attachments" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="field">
+      <div>
+        <div class="field-label">Include comments</div>
+        <div class="field-hint">Append ticket comments to each markdown file</div>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="include-comments" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="field">
+      <div>
+        <div class="field-label">Ask where to save</div>
+        <div class="field-hint">Show browser "Save as" dialog instead of auto-downloading</div>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="save-as">
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="field">
+      <div>
+        <div class="field-label">Context menu</div>
+        <div class="field-hint">Show "Export Jira Ticket" on right-click</div>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="context-menu" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">Saved</div>
+
+  <script src="options.js"></script>
+</body>
+</html>

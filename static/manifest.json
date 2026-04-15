@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "Jira Exporter",
+  "version": "1.0.0",
+  "description": "Export Jira tickets to ZIP \u2014 description, comments, attachments, and linked issues as clean Markdown.",
+  "author": "Jacek Azelski",
+  "homepage_url": "https://github.com/Azelski/JiraExporter",
+  "permissions": [
+    "contextMenus",
+    "downloads",
+    "activeTab",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "*://*.atlassian.net/*",
+    "*://*.atlassian.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": false
+  },
+  "icons": {
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "name": "jira-exporter",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Chrome extension that exports Jira tickets to ZIP for LLM context.",
+  "author": "Jacek Azelski",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Azelski/JiraExporter.git"
+  },
+  "scripts": {
+    "dev": "vite build --watch --mode development",
+    "build": "vite build",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "jszip": "^3.10.1",
+    "node-html-markdown": "^2.0.0"
+  },
+  "devDependencies": {
+    "vite": "^6.3.2"
+  }
+}

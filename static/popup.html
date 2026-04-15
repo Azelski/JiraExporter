@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Jira Exporter</title>
+  <link rel="stylesheet" href="fonts.css">
+  <style>
+    :root {
+      --bg: #0c1322;
+      --surface: #131b2e;
+      --surface-high: #1a2540;
+      --surface-highest: #212d4a;
+      --primary: #d0bcff;
+      --primary-container: #a078ff;
+      --on-surface: #dce2f7;
+      --on-surface-dim: #8e95a9;
+      --on-primary-container: #1a0040;
+      --error: #ffb4ab;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--on-surface);
+      width: 340px;
+    }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb {
+      background: var(--surface-highest);
+      border-radius: 999px;
+    }
+    ::-webkit-scrollbar-thumb:hover { background: var(--primary-container); }
+
+    .content {
+      padding: 1.25rem 1.5rem;
+    }
+
+    /* Ticket detection area */
+    .ticket-area {
+      background: var(--surface);
+      border-radius: 0.375rem;
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+    .ticket-key {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 1.4rem;
+      color: var(--primary);
+    }
+    .ticket-hint {
+      font-size: 0.75rem;
+      color: var(--on-surface-dim);
+      margin-top: 0.25rem;
+    }
+    .no-ticket {
+      color: var(--on-surface-dim);
+      font-size: 0.8125rem;
+    }
+
+    /* Export button */
+    .export-btn {
+      width: 100%;
+      padding: 0.625rem;
+      font-family: 'Inter', system-ui, sans-serif;
+      font-weight: 600;
+      font-size: 0.875rem;
+      color: var(--on-primary-container);
+      background: linear-gradient(135deg, var(--primary), var(--primary-container));
+      border: none;
+      border-radius: 0.375rem;
+      cursor: pointer;
+      transition: opacity 0.2s;
+      margin-bottom: 1rem;
+    }
+    .export-btn:hover { opacity: 0.9; }
+    .export-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+    .export-btn.running {
+      background: var(--surface-high);
+      color: var(--primary);
+      cursor: wait;
+    }
+
+    /* Status */
+    .status {
+      font-size: 0.75rem;
+      text-align: center;
+      margin-bottom: 0.75rem;
+      min-height: 1rem;
+    }
+    .status.ok { color: var(--primary); }
+    .status.err { color: var(--error); }
+
+    /* Divider */
+    .divider {
+      height: 1px;
+      background: var(--surface-high);
+      margin: 0.75rem 0;
+    }
+
+    /* Settings section */
+    .section-title {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      color: var(--on-surface-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.75rem;
+    }
+
+    .field {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.5rem 0;
+    }
+    .field + .field { margin-top: 0.25rem; }
+
+    .field-info { flex: 1; min-width: 0; }
+    .field-label {
+      font-weight: 500;
+      font-size: 0.8125rem;
+    }
+    .field-hint {
+      color: var(--on-surface-dim);
+      font-size: 0.6875rem;
+      margin-top: 0.125rem;
+    }
+
+    input[type=number] {
+      width: 56px;
+      padding: 0.25rem 0.375rem;
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 0.8125rem;
+      color: var(--on-surface);
+      background: var(--surface-highest);
+      border: none;
+      border-bottom: 2px solid transparent;
+      border-radius: 0.25rem 0.25rem 0 0;
+      outline: none;
+      text-align: center;
+      transition: border-color 0.2s;
+    }
+    input[type=number]:focus { border-bottom-color: var(--primary); }
+
+    /* Toggle */
+    .toggle {
+      position: relative;
+      width: 40px;
+      height: 22px;
+      flex-shrink: 0;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle .slider {
+      position: absolute;
+      inset: 0;
+      background: var(--surface-highest);
+      border-radius: 999px;
+      cursor: pointer;
+      transition: background 0.25s;
+    }
+    .toggle .slider::before {
+      content: '';
+      position: absolute;
+      width: 16px; height: 16px;
+      left: 3px; top: 3px;
+      background: var(--on-surface-dim);
+      border-radius: 50%;
+      transition: transform 0.25s, background 0.25s;
+    }
+    .toggle input:checked + .slider {
+      background: linear-gradient(135deg, var(--primary), var(--primary-container));
+    }
+    .toggle input:checked + .slider::before {
+      transform: translateX(18px);
+      background: var(--on-primary-container);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="content">
+
+  <!-- Ticket detection -->
+  <div class="ticket-area" id="ticket-area">
+    <div class="no-ticket" id="no-ticket">Navigate to a Jira ticket to export</div>
+    <div id="ticket-info" style="display:none">
+      <div class="ticket-key" id="ticket-key"></div>
+      <div class="ticket-hint">Ready to export</div>
+    </div>
+  </div>
+
+  <button class="export-btn" id="export-btn" disabled>Export to ZIP</button>
+
+  <div class="status" id="status"></div>
+
+  <div class="divider"></div>
+
+  <!-- Settings inline -->
+  <div class="section-title">Settings</div>
+
+  <div class="field">
+    <div class="field-info">
+      <div class="field-label">Link depth</div>
+      <div class="field-hint">Levels of linked issues to crawl</div>
+    </div>
+    <input type="number" id="depth" min="0" max="10" value="4">
+  </div>
+
+  <div class="field">
+    <div class="field-info">
+      <div class="field-label">LLM context</div>
+      <div class="field-hint">INDEX.md + navigation hints</div>
+    </div>
+    <label class="toggle">
+      <input type="checkbox" id="llm-mode">
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <div class="field">
+    <div class="field-info">
+      <div class="field-label">Include attachments</div>
+      <div class="field-hint">Download and bundle files</div>
+    </div>
+    <label class="toggle">
+      <input type="checkbox" id="include-attachments">
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <div class="field">
+    <div class="field-info">
+      <div class="field-label">Include comments</div>
+      <div class="field-hint">Append ticket comments to md</div>
+    </div>
+    <label class="toggle">
+      <input type="checkbox" id="include-comments">
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <div class="field">
+    <div class="field-info">
+      <div class="field-label">Ask where to save</div>
+      <div class="field-hint">Show "Save as" dialog</div>
+    </div>
+    <label class="toggle">
+      <input type="checkbox" id="save-as">
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <div class="field">
+    <div class="field-info">
+      <div class="field-label">Context menu</div>
+      <div class="field-hint">"Export Jira Ticket" on right-click</div>
+    </div>
+    <label class="toggle">
+      <input type="checkbox" id="context-menu">
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  </div><!-- .content -->
+
+  <script src="popup.js"></script>
+</body>
+</html>
