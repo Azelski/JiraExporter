@@ -165,7 +165,7 @@
     <div class="field">
       <div>
         <div class="field-label">Link crawl depth</div>
-        <div class="field-hint">Levels of linked issues to follow (0 = current only)</div>
+        <div class="field-hint">Levels of linked issues / child pages to follow (0 = current only)</div>
       </div>
       <input type="number" id="depth" min="0" max="10" value="4">
     </div>
@@ -205,6 +205,19 @@
       </div>
       <label class="toggle">
         <input type="checkbox" id="include-comments" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="field">
+      <div>
+        <div class="field-label">Include child pages</div>
+        <div class="field-hint">Crawl nested Confluence pages up to link depth</div>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="include-child-pages" checked>
         <span class="slider"></span>
       </label>
     </div>

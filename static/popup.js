@@ -3,6 +3,7 @@ const DEFAULTS = {
   llmContext: true,
   includeAttachments: true,
   includeComments: true,
+  includeChildPages: true,
   includeAzureRefs: true,
   saveAs: false,
   contextMenu: true,
@@ -23,6 +24,7 @@ const depthInput = $("depth");
 const llmToggle = $("llm-mode");
 const attachToggle = $("include-attachments");
 const commentsToggle = $("include-comments");
+const childPagesToggle = $("include-child-pages");
 const azureRefsToggle = $("include-azure-refs");
 const saveAsToggle = $("save-as");
 const ctxMenuToggle = $("context-menu");
@@ -30,6 +32,28 @@ const ctxMenuToggle = $("context-menu");
 let detectedType = null;
 let detectedKey = null;
 let detectedUrl = null;
+
+function updateContextUI() {
+  if (!detectedType) return;
+
+  document.querySelectorAll("[data-context]").forEach((el) => {
+    el.style.display = el.dataset.context === detectedType ? "" : "none";
+  });
+
+  const depthLabel = $("depth-label");
+  const depthHint = $("depth-hint");
+  const commentsHint = $("comments-hint");
+
+  if (detectedType === "jira") {
+    depthLabel.textContent = "Link depth";
+    depthHint.textContent = "Levels of linked issues to crawl";
+    commentsHint.textContent = "Append ticket comments";
+  } else if (detectedType === "confluence") {
+    depthLabel.textContent = "Child depth";
+    depthHint.textContent = "Levels of child pages to crawl";
+    commentsHint.textContent = "Append page comments";
+  }
+}
 
 async function detectPage() {
   try {
@@ -66,6 +90,8 @@ async function detectPage() {
       exportBtn.disabled = false;
       exportBtn.textContent = "Export Page";
     }
+
+    updateContextUI();
   } catch { }
 }
 
@@ -74,6 +100,7 @@ chrome.storage.sync.get(DEFAULTS, (items) => {
   llmToggle.checked = items.llmContext;
   attachToggle.checked = items.includeAttachments;
   commentsToggle.checked = items.includeComments;
+  childPagesToggle.checked = items.includeChildPages;
   azureRefsToggle.checked = items.includeAzureRefs;
   saveAsToggle.checked = items.saveAs;
   ctxMenuToggle.checked = items.contextMenu;
@@ -92,6 +119,7 @@ depthInput.addEventListener("change", () => {
 llmToggle.addEventListener("change", () => save({ llmContext: llmToggle.checked }));
 attachToggle.addEventListener("change", () => save({ includeAttachments: attachToggle.checked }));
 commentsToggle.addEventListener("change", () => save({ includeComments: commentsToggle.checked }));
+childPagesToggle.addEventListener("change", () => save({ includeChildPages: childPagesToggle.checked }));
 azureRefsToggle.addEventListener("change", () => save({ includeAzureRefs: azureRefsToggle.checked }));
 saveAsToggle.addEventListener("change", () => save({ saveAs: saveAsToggle.checked }));
 ctxMenuToggle.addEventListener("change", () => save({ contextMenu: ctxMenuToggle.checked }));
@@ -133,6 +161,22 @@ exportBtn.addEventListener("click", async () => {
 });
 
 detectPage();
+
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg.action === "confirm-error") {
+    statusEl.textContent = "⚠ Fetch error — check dialog";
+    statusEl.className = "status err";
+    const shouldContinue = confirm(msg.message);
+    sendResponse({ continue: shouldContinue });
+    if (!shouldContinue) {
+      statusEl.textContent = "Export aborted";
+    } else {
+      statusEl.textContent = "Continuing…";
+      statusEl.className = "status";
+    }
+    return true;
+  }
+});
 
 async function renderCustomFields() {
   const { customFieldDefs = {} } = await chrome.storage.local.get({ customFieldDefs: {} });

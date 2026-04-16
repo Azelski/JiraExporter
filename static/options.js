@@ -2,6 +2,7 @@ const depthInput = document.getElementById("depth");
 const llmToggle = document.getElementById("llm-mode");
 const attachToggle = document.getElementById("include-attachments");
 const commentsToggle = document.getElementById("include-comments");
+const childPagesToggle = document.getElementById("include-child-pages");
 const azureRefsToggle = document.getElementById("include-azure-refs");
 const saveAsToggle = document.getElementById("save-as");
 const ctxMenuToggle = document.getElementById("context-menu");
@@ -12,6 +13,7 @@ const DEFAULTS = {
   llmContext: true,
   includeAttachments: true,
   includeComments: true,
+  includeChildPages: true,
   includeAzureRefs: true,
   saveAs: false,
   contextMenu: true,
@@ -22,6 +24,7 @@ chrome.storage.sync.get(DEFAULTS, (items) => {
   llmToggle.checked = items.llmContext;
   attachToggle.checked = items.includeAttachments;
   commentsToggle.checked = items.includeComments;
+  childPagesToggle.checked = items.includeChildPages;
   azureRefsToggle.checked = items.includeAzureRefs;
   saveAsToggle.checked = items.saveAs;
   ctxMenuToggle.checked = items.contextMenu;
@@ -43,6 +46,7 @@ depthInput.addEventListener("change", () => {
 llmToggle.addEventListener("change", () => save({ llmContext: llmToggle.checked }));
 attachToggle.addEventListener("change", () => save({ includeAttachments: attachToggle.checked }));
 commentsToggle.addEventListener("change", () => save({ includeComments: commentsToggle.checked }));
+childPagesToggle.addEventListener("change", () => save({ includeChildPages: childPagesToggle.checked }));
 azureRefsToggle.addEventListener("change", () => save({ includeAzureRefs: azureRefsToggle.checked }));
 saveAsToggle.addEventListener("change", () => save({ saveAs: saveAsToggle.checked }));
 ctxMenuToggle.addEventListener("change", () => save({ contextMenu: ctxMenuToggle.checked }));

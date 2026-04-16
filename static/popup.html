@@ -230,8 +230,8 @@
 
   <div class="field">
     <div class="field-info">
-      <div class="field-label">Link depth</div>
-      <div class="field-hint">Levels of linked issues to crawl</div>
+      <div class="field-label" id="depth-label">Link depth</div>
+      <div class="field-hint" id="depth-hint">Levels of linked issues / child pages</div>
     </div>
     <input type="number" id="depth" min="0" max="10" value="4">
   </div>
@@ -261,10 +261,21 @@
   <div class="field">
     <div class="field-info">
       <div class="field-label">Include comments</div>
-      <div class="field-hint">Append ticket comments to md</div>
+      <div class="field-hint" id="comments-hint">Append ticket comments</div>
     </div>
     <label class="toggle">
       <input type="checkbox" id="include-comments">
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <div class="field" data-context="confluence">
+    <div class="field-info">
+      <div class="field-label">Include child pages</div>
+      <div class="field-hint">Crawl nested child pages</div>
+    </div>
+    <label class="toggle">
+      <input type="checkbox" id="include-child-pages">
       <span class="slider"></span>
     </label>
   </div>
@@ -294,7 +305,7 @@
   <div class="field">
     <div class="field-info">
       <div class="field-label">Context menu</div>
-      <div class="field-hint">"Export Jira Ticket" on right-click</div>
+      <div class="field-hint">Right-click export shortcut</div>
     </div>
     <label class="toggle">
       <input type="checkbox" id="context-menu">
@@ -304,8 +315,8 @@
 
   </div><!-- .content -->
 
-  <!-- Custom fields section -->
-  <div id="custom-fields-section">
+  <!-- Custom fields section (Jira only) -->
+  <div id="custom-fields-section" data-context="jira">
     <div class="content" style="padding-top:0">
       <div class="divider"></div>
       <div class="section-title collapsible" id="custom-fields-title">
