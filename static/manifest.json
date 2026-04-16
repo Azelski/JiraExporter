@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Jira Exporter",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Export Jira tickets to ZIP — description, comments, attachments, and linked issues as clean Markdown.",
   "author": "Jacek Azelski",
   "homepage_url": "https://github.com/Azelski/JiraExporter",
