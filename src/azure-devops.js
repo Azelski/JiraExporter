@@ -124,15 +124,19 @@ async function resolvePullRequest(originalUrl, org, project, repo, prId) {
       `${apiBase}/pullrequests/${enc(prId)}/threads?api-version=7.1`,
     );
     const meaningful = (threads.value ?? []).filter(
-      (t) => t.comments?.length && !t.isDeleted && t.status !== "closed",
+      (t) => t.comments?.some((c) => c.commentType !== "system") && !t.isDeleted,
     );
     if (meaningful.length) {
       lines.push("### Review Comments");
       lines.push("");
-      for (const thread of meaningful.slice(0, 30)) {
+      for (const thread of meaningful.slice(0, 50)) {
         const ctx = thread.threadContext;
+        const statusTag = thread.status && thread.status !== "unknown" ? ` [${thread.status}]` : "";
         if (ctx?.filePath) {
-          lines.push(`**${ctx.filePath}** (line ${ctx.rightFileStart?.line ?? "?"})`);
+          lines.push(`**${ctx.filePath}** (line ${ctx.rightFileStart?.line ?? "?"})${statusTag}`);
+          lines.push("");
+        } else if (statusTag) {
+          lines.push(`**General comment**${statusTag}`);
           lines.push("");
         }
         for (const c of thread.comments) {
