@@ -14,7 +14,8 @@
   ],
   "host_permissions": [
     "*://*.atlassian.net/*",
-    "*://*.atlassian.com/*"
+    "*://*.atlassian.com/*",
+    "*://dev.azure.com/*"
   ],
   "action": {
     "default_popup": "popup.html",

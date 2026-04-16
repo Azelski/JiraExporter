@@ -3,6 +3,7 @@ const DEFAULTS = {
   llmContext: true,
   includeAttachments: true,
   includeComments: true,
+  includeAzureRefs: true,
   saveAs: false,
   contextMenu: true,
   disabledCustomFields: [],
@@ -14,6 +15,7 @@ const ticketArea = $("ticket-area");
 const noTicket = $("no-ticket");
 const ticketInfo = $("ticket-info");
 const ticketKeyEl = $("ticket-key");
+const ticketHintEl = $("ticket-hint");
 const exportBtn = $("export-btn");
 const statusEl = $("status");
 
@@ -21,25 +23,48 @@ const depthInput = $("depth");
 const llmToggle = $("llm-mode");
 const attachToggle = $("include-attachments");
 const commentsToggle = $("include-comments");
+const azureRefsToggle = $("include-azure-refs");
 const saveAsToggle = $("save-as");
 const ctxMenuToggle = $("context-menu");
 
+let detectedType = null;
 let detectedKey = null;
 let detectedUrl = null;
 
-async function detectTicket() {
+async function detectPage() {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab?.url) return;
-    const m = tab.url.match(/^(https?:\/\/[^/]+)\/browse\/([A-Z][A-Z0-9_]+-\d+)/);
-    if (m) {
-      detectedKey = m[2];
+
+    const jiraMatch = tab.url.match(/^(https?:\/\/[^/]+)\/browse\/([A-Z][A-Z0-9_]+-\d+)/);
+    const confluenceMatch = tab.url.match(
+      /^(https?:\/\/[^/]+)\/wiki\/spaces\/[^/]+\/pages\/(\d+)(?:\/([^?#]*))?/,
+    );
+
+    if (jiraMatch) {
+      detectedType = "jira";
+      detectedKey = jiraMatch[2];
       detectedUrl = tab.url;
       ticketKeyEl.textContent = detectedKey;
+      ticketHintEl.textContent = "Jira ticket — ready to export";
       noTicket.style.display = "none";
       ticketInfo.style.display = "block";
       exportBtn.disabled = false;
       exportBtn.textContent = `Export ${detectedKey}`;
+    } else if (confluenceMatch) {
+      detectedType = "confluence";
+      detectedKey = confluenceMatch[2];
+      detectedUrl = tab.url;
+      const titleSlug = confluenceMatch[3];
+      const pageTitle = titleSlug
+        ? decodeURIComponent(titleSlug.replace(/\+/g, " ")).replace(/-/g, " ")
+        : `Page ${detectedKey}`;
+      ticketKeyEl.textContent = pageTitle;
+      ticketHintEl.textContent = "Confluence page — ready to export";
+      noTicket.style.display = "none";
+      ticketInfo.style.display = "block";
+      exportBtn.disabled = false;
+      exportBtn.textContent = "Export Page";
     }
   } catch { }
 }
@@ -49,6 +74,7 @@ chrome.storage.sync.get(DEFAULTS, (items) => {
   llmToggle.checked = items.llmContext;
   attachToggle.checked = items.includeAttachments;
   commentsToggle.checked = items.includeComments;
+  azureRefsToggle.checked = items.includeAzureRefs;
   saveAsToggle.checked = items.saveAs;
   ctxMenuToggle.checked = items.contextMenu;
 });
@@ -66,12 +92,14 @@ depthInput.addEventListener("change", () => {
 llmToggle.addEventListener("change", () => save({ llmContext: llmToggle.checked }));
 attachToggle.addEventListener("change", () => save({ includeAttachments: attachToggle.checked }));
 commentsToggle.addEventListener("change", () => save({ includeComments: commentsToggle.checked }));
+azureRefsToggle.addEventListener("change", () => save({ includeAzureRefs: azureRefsToggle.checked }));
 saveAsToggle.addEventListener("change", () => save({ saveAs: saveAsToggle.checked }));
 ctxMenuToggle.addEventListener("change", () => save({ contextMenu: ctxMenuToggle.checked }));
 
 exportBtn.addEventListener("click", async () => {
   if (!detectedKey) return;
 
+  const btnLabel = exportBtn.textContent;
   exportBtn.disabled = true;
   exportBtn.classList.add("running");
   exportBtn.textContent = "Exporting…";
@@ -79,18 +107,20 @@ exportBtn.addEventListener("click", async () => {
   statusEl.className = "status";
 
   try {
-    const response = await chrome.runtime.sendMessage({
-      action: "export",
-      url: detectedUrl,
-    });
+    const action = detectedType === "confluence" ? "export-confluence" : "export";
+    const response = await chrome.runtime.sendMessage({ action, url: detectedUrl });
 
     if (response?.error) {
       statusEl.textContent = response.error;
       statusEl.className = "status err";
     } else {
-      statusEl.textContent = `${response?.file ?? detectedKey + ".zip"} — ${response?.issueCount ?? "?"} issue(s)`;
+      const count =
+        response?.pageCount != null
+          ? `${response.pageCount} page(s)`
+          : `${response?.issueCount ?? "?"} issue(s)`;
+      statusEl.textContent = `${response?.file} — ${count}`;
       statusEl.className = "status ok";
-      renderCustomFields();
+      if (detectedType !== "confluence") renderCustomFields();
     }
   } catch (err) {
     statusEl.textContent = err.message;
@@ -99,10 +129,10 @@ exportBtn.addEventListener("click", async () => {
 
   exportBtn.disabled = false;
   exportBtn.classList.remove("running");
-  exportBtn.textContent = `Export ${detectedKey}`;
+  exportBtn.textContent = btnLabel;
 });
 
-detectTicket();
+detectPage();
 
 async function renderCustomFields() {
   const { customFieldDefs = {} } = await chrome.storage.local.get({ customFieldDefs: {} });

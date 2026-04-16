@@ -212,10 +212,10 @@
 
   <!-- Ticket detection -->
   <div class="ticket-area" id="ticket-area">
-    <div class="no-ticket" id="no-ticket">Navigate to a Jira ticket to export</div>
+    <div class="no-ticket" id="no-ticket">Navigate to a Jira ticket or Confluence page to export</div>
     <div id="ticket-info" style="display:none">
       <div class="ticket-key" id="ticket-key"></div>
-      <div class="ticket-hint">Ready to export</div>
+      <div class="ticket-hint" id="ticket-hint">Ready to export</div>
     </div>
   </div>
 
@@ -265,6 +265,17 @@
     </div>
     <label class="toggle">
       <input type="checkbox" id="include-comments">
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <div class="field">
+    <div class="field-info">
+      <div class="field-label">Azure DevOps refs</div>
+      <div class="field-hint">Fetch linked PRs, files &amp; commits</div>
+    </div>
+    <label class="toggle">
+      <input type="checkbox" id="include-azure-refs">
       <span class="slider"></span>
     </label>
   </div>
