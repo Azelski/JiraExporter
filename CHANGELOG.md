@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 Changelog entries are generated automatically from commit messages using [Conventional Commits](https://www.conventionalcommits.org/).
 Releases are managed by [release-please](https://github.com/googleapis/release-please).
 
+## [1.2.0](https://github.com/Azelski/JiraExporter/compare/jira-exporter-v1.1.1...jira-exporter-v1.2.0) (2026-04-16)
+
+
+### Features
+
+* ask user confirmation when fetches fail during export ([a5cbe55](https://github.com/Azelski/JiraExporter/commit/a5cbe55a4a136a53eb8daccc2e4071553d12cfc9))
+* child page toggle, error confirmations, slug-based Confluence naming ([79efe12](https://github.com/Azelski/JiraExporter/commit/79efe12dbee68f42816d692d2f00d74252dcb78d))
+* context-aware popup with page-specific settings ([d35b810](https://github.com/Azelski/JiraExporter/commit/d35b810234ecb047e656bbf71bb042e2bb88d167))
+
+
+### Bug Fixes
+
+* include resolved PR comment threads in Azure DevOps export ([3b20837](https://github.com/Azelski/JiraExporter/commit/3b20837af8739e0412af763e6607b88def3201bd))
+
 ## [1.1.1](https://github.com/Azelski/JiraExporter/compare/jira-exporter-v1.1.0...jira-exporter-v1.1.1) (2026-04-16)
 
 
