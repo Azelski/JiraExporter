@@ -14,7 +14,7 @@
   ],
   "host_permissions": [
     "*://*.atlassian.net/*",
-    "*://*.atlassian.com/*",
+    "*://api.media.atlassian.com/*",
     "*://dev.azure.com/*"
   ],
   "action": {
