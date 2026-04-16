@@ -7,7 +7,7 @@ export function htmlToMarkdown(html) {
   return nhm.translate(html);
 }
 
-export function buildMarkdown(issue, attachFiles, opts = {}) {
+export function buildJiraIssueMarkdown(issue, attachFiles, opts = {}) {
   const { includeComments = true, disabledCustomFields = [] } = opts;
   const fields = issue.fields;
   const rendered = issue.renderedFields ?? {};
@@ -129,4 +129,93 @@ export function buildMarkdown(issue, attachFiles, opts = {}) {
 
 function escapeRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+export function buildConfluencePageMarkdown(page, comments, attachFiles, opts = {}) {
+  const { includeComments = true } = opts;
+  const lines = [];
+
+  const title = page.title ?? "(untitled)";
+  const space = page.space?.name ?? page.space?.key ?? "–";
+  const version = page.version?.number ?? "–";
+  const lastUpdated = page.version?.when ?? "–";
+  const updatedBy = page.version?.by?.displayName ?? "–";
+  const created = page.history?.createdDate ?? "–";
+  const createdBy = page.history?.createdBy?.displayName ?? "–";
+
+  lines.push(`# ${title}`);
+  lines.push("");
+  lines.push(`| Field | Value |`);
+  lines.push(`|-------|-------|`);
+  lines.push(`| **Space** | ${space} |`);
+  lines.push(`| **Version** | ${version} |`);
+  lines.push(`| **Created** | ${created} |`);
+  lines.push(`| **Created by** | ${createdBy} |`);
+  lines.push(`| **Last updated** | ${lastUpdated} |`);
+  lines.push(`| **Updated by** | ${updatedBy} |`);
+
+  const labels = page.metadata?.labels?.results?.map((l) => l.name) ?? [];
+  if (labels.length) {
+    lines.push(`| **Labels** | ${labels.join(", ")} |`);
+  }
+  lines.push("");
+
+  const ancestors = page.ancestors ?? [];
+  if (ancestors.length) {
+    lines.push("## Breadcrumb");
+    lines.push("");
+    lines.push(ancestors.map((a) => a.title).join(" > ") + ` > ${title}`);
+    lines.push("");
+  }
+
+  lines.push("## Content");
+  lines.push("");
+  const bodyHtml = page.body?.view?.value ?? "";
+  lines.push(htmlToMarkdown(bodyHtml));
+  lines.push("");
+
+  if (includeComments && comments.length) {
+    lines.push("## Comments");
+    lines.push("");
+    for (const c of comments) {
+      const author = c.version?.by?.displayName ?? "Unknown";
+      const date = c.version?.when ?? "";
+      const commentHtml = c.body?.view?.value ?? "";
+      lines.push(`### ${author} — ${date}`);
+      lines.push("");
+      lines.push(htmlToMarkdown(commentHtml));
+      lines.push("");
+    }
+  }
+
+  const childPages = page.children?.page?.results ?? [];
+  if (childPages.length) {
+    lines.push("## Child Pages");
+    lines.push("");
+    for (const child of childPages) {
+      lines.push(`- [${child.title}](../${child.id}/${child.id}.md)`);
+    }
+    lines.push("");
+  }
+
+  if (attachFiles.length) {
+    lines.push("## Attachments");
+    lines.push("");
+    for (const name of attachFiles) {
+      lines.push(`- [${name}](./attachments/${name})`);
+    }
+    lines.push("");
+  }
+
+  let md = lines.join("\n");
+
+  for (const name of attachFiles) {
+    const pattern = new RegExp(
+      `(\\!?\\[([^\\]]*?)\\])\\(https?://[^)]+\\/${escapeRegex(name)}\\)`,
+      "g",
+    );
+    md = md.replace(pattern, `$1(./attachments/${name})`);
+  }
+
+  return md;
 }

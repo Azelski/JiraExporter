@@ -1,6 +1,6 @@
-import { fetchIssue } from "./jira-api.js";
+import { fetchJiraIssue } from "./jira-api.js";
 
-export async function crawlLinkedIssues(baseUrl, rootKey, maxDepth) {
+export async function crawlJiraLinkedIssues(baseUrl, rootKey, maxDepth) {
   const visited = new Map();
   await crawl(baseUrl, rootKey, 0, maxDepth, visited);
   return visited;
@@ -10,7 +10,7 @@ async function crawl(baseUrl, issueKey, depth, maxDepth, visited) {
   if (visited.has(issueKey)) return;
 
   console.log(`[JiraExporter] Fetching ${issueKey} (depth ${depth}/${maxDepth})`);
-  const issue = await fetchIssue(baseUrl, issueKey);
+  const issue = await fetchJiraIssue(baseUrl, issueKey);
   visited.set(issueKey, issue);
 
   if (depth >= maxDepth) return;

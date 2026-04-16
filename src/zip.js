@@ -1,6 +1,6 @@
 import JSZip from "jszip";
 
-export async function buildZip(rootKey, issues, indexMd) {
+export async function buildExportZip(rootKey, issues, indexMd) {
   const zip = new JSZip();
   const root = zip.folder(rootKey);
 
