@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 Changelog entries are generated automatically from commit messages using [Conventional Commits](https://www.conventionalcommits.org/).
 Releases are managed by [release-please](https://github.com/googleapis/release-please).
 
+## [1.2.1](https://github.com/Azelski/JiraExporter/compare/jira-exporter-v1.2.0...jira-exporter-v1.2.1) (2026-04-16)
+
+
+### Bug Fixes
+
+* narrow host_permissions by replacing *.atlassian.com wildcard ([6a250de](https://github.com/Azelski/JiraExporter/commit/6a250de2eb7098ffe1e9e99c1f79b4e6aafa910e))
+
 ## [1.2.0](https://github.com/Azelski/JiraExporter/compare/jira-exporter-v1.1.1...jira-exporter-v1.2.0) (2026-04-16)
 
 
