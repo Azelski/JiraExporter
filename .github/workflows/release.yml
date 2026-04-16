@@ -41,7 +41,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref }}
+          ref: ${{ needs.release-please.outputs.tag_name || github.ref }}
 
       - uses: DeterminateSystems/nix-installer-action@v16
 
