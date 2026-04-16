@@ -11,6 +11,7 @@ const SETTING_DEFAULTS = {
   llmContext: true,
   includeAttachments: true,
   includeComments: true,
+  includeChildPages: true,
   includeAzureRefs: true,
   saveAs: false,
   contextMenu: true,
@@ -111,6 +112,27 @@ function sanitizeFilename(name) {
   return name.replace(/[/\\:*?"<>|]/g, "_").trim().substring(0, 100);
 }
 
+async function askUserToContinue(errorMsg) {
+  try {
+    const response = await chrome.runtime.sendMessage({
+      action: "confirm-error",
+      message: errorMsg,
+    });
+    return response?.continue ?? false;
+  } catch {
+    return false;
+  }
+}
+
+class ExportAbortedError extends Error {
+  constructor() { super("Export aborted by user"); }
+}
+
+async function skipOrAbort(errorMsg) {
+  const skip = await askUserToContinue(errorMsg);
+  if (!skip) throw new ExportAbortedError();
+}
+
 async function getSettings() {
   try {
     return await chrome.storage.sync.get(SETTING_DEFAULTS);
@@ -124,28 +146,31 @@ async function exportJiraIssue(baseUrl, issueKey) {
   const { linkDepth: maxDepth, llmContext, includeAttachments, includeComments, includeAzureRefs, saveAs, disabledCustomFields } = settings;
   console.log(`[JiraExporter] Exporting ${issueKey}`, settings);
 
-  const issueMap = await crawlJiraLinkedIssues(baseUrl, issueKey, maxDepth);
+  const issueMap = await crawlJiraLinkedIssues(baseUrl, issueKey, maxDepth, skipOrAbort);
   console.log(`[JiraExporter] Fetched ${issueMap.size} issue(s)`);
 
   const allDiscoveredFields = {};
-  const issues = await Promise.all(
-    [...issueMap.entries()].map(async ([key, issue]) => {
-      let attachments = [];
-      if (includeAttachments) {
-        const rawAttachments = issue.fields?.attachment ?? [];
-        attachments = await Promise.all(
-          rawAttachments.map(async (att) => {
-            const data = await fetchBinaryAttachment(att.content);
-            return { name: att.filename, data };
-          }),
-        );
+  const issues = [];
+  for (const [key, issue] of issueMap) {
+    let attachments = [];
+    if (includeAttachments) {
+      const rawAttachments = issue.fields?.attachment ?? [];
+      for (const att of rawAttachments) {
+        try {
+          const data = await fetchBinaryAttachment(att.content);
+          attachments.push({ name: att.filename, data });
+        } catch (err) {
+          await skipOrAbort(`Attachment "${att.filename}" failed: ${err.message}\n\nSkip and continue?`);
+        }
       }
+    }
 
-      const attachFileNames = attachments.map((a) => a.name);
-      let { md, discoveredFields } = buildJiraIssueMarkdown(issue, attachFileNames, { includeComments, disabledCustomFields });
-      Object.assign(allDiscoveredFields, discoveredFields);
+    const attachFileNames = attachments.map((a) => a.name);
+    let { md, discoveredFields } = buildJiraIssueMarkdown(issue, attachFileNames, { includeComments, disabledCustomFields });
+    Object.assign(allDiscoveredFields, discoveredFields);
 
-      if (includeAzureRefs) {
+    if (includeAzureRefs) {
+      try {
         const rendered = issue.renderedFields ?? {};
         const rawHtmlSources = [
           rendered.description ?? issue.fields?.description ?? "",
@@ -155,11 +180,13 @@ async function exportJiraIssue(baseUrl, issueKey) {
         const azureRefs = await resolveAzureDevOpsRefs(md, ...rawHtmlSources);
         const azureSection = buildAzureRefsMarkdownSection(azureRefs);
         if (azureSection) md += "\n" + azureSection;
+      } catch (err) {
+        await skipOrAbort(`Azure DevOps refs for ${key} failed: ${err.message}\n\nSkip and continue?`);
       }
+    }
 
-      return { key, md, attachments };
-    }),
-  );
+    issues.push({ key, md, attachments });
+  }
 
   if (Object.keys(allDiscoveredFields).length) {
     const { customFieldDefs = {} } = await chrome.storage.local.get({ customFieldDefs: {} });
@@ -224,7 +251,14 @@ async function crawlPage(baseUrl, pageId, depth, maxDepth, visited) {
   if (visited.has(pageId)) return;
 
   console.log(`[JiraExporter] Fetching Confluence page ${pageId} (depth ${depth}/${maxDepth})`);
-  const page = await fetchConfluencePage(baseUrl, pageId);
+  let page;
+  try {
+    page = await fetchConfluencePage(baseUrl, pageId);
+  } catch (err) {
+    let skip = await askUserToContinue(`Failed to fetch page ${pageId}: ${err.message}\n\nSkip and continue?`);
+    if (skip) return;
+    throw new ExportAbortedError();
+  }
   visited.set(pageId, page);
 
   if (depth >= maxDepth) return;
@@ -237,39 +271,53 @@ async function crawlPage(baseUrl, pageId, depth, maxDepth, visited) {
 
 async function exportConfluencePages(baseUrl, pageId) {
   const settings = await getSettings();
-  const { linkDepth: maxDepth, llmContext, includeAttachments, includeComments, includeAzureRefs, saveAs } = settings;
+  const { linkDepth: maxDepth, llmContext, includeAttachments, includeComments, includeChildPages, includeAzureRefs, saveAs } = settings;
   console.log(`[JiraExporter] Exporting Confluence page ${pageId}`, settings);
 
-  const pageMap = await crawlConfluencePages(baseUrl, pageId, maxDepth);
+  const childDepth = includeChildPages ? maxDepth : 0;
+  const pageMap = await crawlConfluencePages(baseUrl, pageId, childDepth);
   console.log(`[JiraExporter] Fetched ${pageMap.size} Confluence page(s)`);
 
-  const pages = await Promise.all(
-    [...pageMap.entries()].map(async ([id, page]) => {
-      let attachments = [];
-      if (includeAttachments) {
+  const slugMap = buildConfluenceSlugMap(pageMap);
+
+  const pages = [];
+  for (const [id, page] of pageMap) {
+    let attachments = [];
+    if (includeAttachments) {
+      try {
         const rawAttachments = await fetchConfluencePageAttachments(baseUrl, id);
-        const resolved = await Promise.all(
-          rawAttachments.map(async (att) => {
+        for (const att of rawAttachments) {
+          try {
             const downloadPath = att._links?.download;
-            if (!downloadPath) return null;
+            if (!downloadPath) continue;
             const prefix = downloadPath.startsWith("/wiki") ? "" : "/wiki";
             const downloadUrl = `${baseUrl}${prefix}${downloadPath}`;
             const data = await fetchBinaryAttachment(downloadUrl);
-            return { name: att.title, data };
-          }),
-        );
-        attachments = resolved.filter(Boolean);
+            attachments.push({ name: att.title, data });
+          } catch (err) {
+            await skipOrAbort(`Attachment "${att.title}" failed: ${err.message}\n\nSkip and continue?`);
+          }
+        }
+      } catch (err) {
+        if (err instanceof ExportAbortedError) throw err;
+        await skipOrAbort(`Fetching attachments for page failed: ${err.message}\n\nSkip and continue?`);
       }
+    }
 
-      let comments = [];
-      if (includeComments) {
+    let comments = [];
+    if (includeComments) {
+      try {
         comments = await fetchConfluenceComments(baseUrl, id);
+      } catch (err) {
+        await skipOrAbort(`Comments for page failed: ${err.message}\n\nSkip and continue?`);
       }
+    }
 
-      const attachFileNames = attachments.map((a) => a.name);
-      let md = buildConfluencePageMarkdown(page, comments, attachFileNames, { includeComments });
+    const attachFileNames = attachments.map((a) => a.name);
+    let md = buildConfluencePageMarkdown(page, comments, attachFileNames, { includeComments, slugMap });
 
-      if (includeAzureRefs) {
+    if (includeAzureRefs) {
+      try {
         const rawHtmlSources = [
           page.body?.view?.value ?? "",
           ...comments.map((c) => c.body?.view?.value ?? ""),
@@ -277,18 +325,21 @@ async function exportConfluencePages(baseUrl, pageId) {
         const azureRefs = await resolveAzureDevOpsRefs(md, ...rawHtmlSources);
         const azureSection = buildAzureRefsMarkdownSection(azureRefs);
         if (azureSection) md += "\n" + azureSection;
+      } catch (err) {
+        if (err instanceof ExportAbortedError) throw err;
+        await skipOrAbort(`Azure DevOps refs failed: ${err.message}\n\nSkip and continue?`);
       }
+    }
 
-      return { key: id, md, attachments };
-    }),
-  );
+    pages.push({ key: slugMap[id], md, attachments });
+  }
 
   const rootPage = pageMap.get(pageId);
-  const rootTitle = sanitizeFilename(rootPage?.title ?? pageId);
-  const index = llmContext ? buildConfluenceExportIndex(pageId, rootTitle, pages, pageMap) : null;
+  const rootSlug = slugMap[pageId];
+  const index = llmContext ? buildConfluenceExportIndex(rootSlug, pages, pageMap, slugMap) : null;
 
-  const base64 = await buildExportZip(rootTitle, pages, index);
-  const filename = `${rootTitle}.zip`;
+  const base64 = await buildExportZip(rootSlug, pages, index);
+  const filename = `${rootSlug}.zip`;
   const dataUrl = `data:application/zip;base64,${base64}`;
   chrome.downloads.download({ url: dataUrl, filename, saveAs });
 
@@ -296,27 +347,48 @@ async function exportConfluencePages(baseUrl, pageId) {
   return { file: filename, pageCount: pages.length };
 }
 
-function buildConfluenceExportIndex(rootId, rootTitle, pages, pageMap) {
+function buildConfluenceSlugMap(pageMap) {
+  const slugs = {};
+  const usedSlugs = new Set();
+
+  for (const [id, page] of pageMap) {
+    let slug = sanitizeFilename(page.title ?? id);
+    if (!slug) slug = String(id);
+
+    let unique = slug;
+    let counter = 2;
+    while (usedSlugs.has(unique)) {
+      unique = `${slug}-${counter++}`;
+    }
+    usedSlugs.add(unique);
+    slugs[id] = unique;
+  }
+
+  return slugs;
+}
+
+function buildConfluenceExportIndex(rootSlug, pages, pageMap, slugMap) {
   const lines = [];
 
-  lines.push(`# ${rootTitle} — Export Index`);
+  lines.push(`# ${rootSlug} — Export Index`);
   lines.push("");
   lines.push("This archive was exported from Confluence for LLM context.");
   lines.push("");
   lines.push("## Main Page");
   lines.push("");
-  lines.push(`- [${rootTitle}](./${rootId}/${rootId}.md)`);
+  lines.push(`- [${rootSlug}](./${rootSlug}/${rootSlug}.md)`);
   lines.push("");
 
-  const others = pages.filter((p) => p.key !== rootId);
+  const others = pages.filter((p) => p.key !== rootSlug);
   if (others.length) {
     lines.push(`## Child Pages (${others.length})`);
     lines.push("");
     for (const { key } of others) {
-      const page = pageMap.get(key);
+      const id = Object.keys(slugMap).find((k) => slugMap[k] === key);
+      const page = id ? pageMap.get(id) : null;
       const title = page?.title ?? key;
       const space = page?.space?.key ?? "";
-      lines.push(`- [${key}](./${key}/${key}.md) — ${title}${space ? ` (${space})` : ""}`);
+      lines.push(`- [${title}](./${key}/${key}.md)${space ? ` (${space})` : ""}`);
     }
     lines.push("");
   }

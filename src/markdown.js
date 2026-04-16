@@ -132,7 +132,7 @@ function escapeRegex(s) {
 }
 
 export function buildConfluencePageMarkdown(page, comments, attachFiles, opts = {}) {
-  const { includeComments = true } = opts;
+  const { includeComments = true, slugMap = {} } = opts;
   const lines = [];
 
   const title = page.title ?? "(untitled)";
@@ -193,7 +193,8 @@ export function buildConfluencePageMarkdown(page, comments, attachFiles, opts = 
     lines.push("## Child Pages");
     lines.push("");
     for (const child of childPages) {
-      lines.push(`- [${child.title}](../${child.id}/${child.id}.md)`);
+      const childSlug = slugMap[child.id] ?? child.id;
+      lines.push(`- [${child.title}](../${childSlug}/${childSlug}.md)`);
     }
     lines.push("");
   }
