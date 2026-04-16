@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 Changelog entries are generated automatically from commit messages using [Conventional Commits](https://www.conventionalcommits.org/).
 Releases are managed by [release-please](https://github.com/googleapis/release-please).
 
+## [1.1.1](https://github.com/Azelski/JiraExporter/compare/jira-exporter-v1.1.0...jira-exporter-v1.1.1) (2026-04-16)
+
+
+### Bug Fixes
+
+* **ci:** check out release tag so build uses bumped version ([5a221a9](https://github.com/Azelski/JiraExporter/commit/5a221a9b8f40375b90c0dcae856696e93ef74b26))
+
 ## [1.1.0](https://github.com/Azelski/JiraExporter/compare/jira-exporter-v1.0.0...jira-exporter-v1.1.0) (2026-04-16)
 
 
